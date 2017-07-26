@@ -30,7 +30,8 @@ public class SnapshotTxOperation extends Operation {
             if (operations.get(x) instanceof OptimisticTxOperation
                     || operations.get(x) instanceof SnapshotTxOperation
                     || operations.get(x) instanceof RemoveOperation
-                    || operations.get(x) instanceof WriteOperation) {
+                    || operations.get(x) instanceof WriteOperation
+                    || operations.get(x) instanceof NestedTxOperation) {
                 continue;
             }
 

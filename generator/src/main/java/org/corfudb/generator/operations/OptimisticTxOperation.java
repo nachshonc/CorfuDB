@@ -23,7 +23,10 @@ public class OptimisticTxOperation extends Operation {
         List<Operation> operations = state.getOperations().sample(numOperations);
 
         for (int x = 0; x < operations.size(); x++) {
-            if (operations.get(x) instanceof OptimisticTxOperation) {
+            if (operations.get(x) instanceof OptimisticTxOperation
+                    || operations.get(x) instanceof SnapshotTxOperation
+                    || operations.get(x) instanceof NestedTxOperation)
+            {
                 continue;
             }
 
