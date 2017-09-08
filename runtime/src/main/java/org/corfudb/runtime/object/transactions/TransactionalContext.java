@@ -6,6 +6,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nonnull;
+
+import org.corfudb.protocols.logprotocol.SMREntry;
+import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
+
 import lombok.extern.slf4j.Slf4j;
 
 /** A class which allows access to transactional contexts, which manage
@@ -40,6 +45,26 @@ public class TransactionalContext {
      */
     public static Deque<AbstractTransactionalContext> getTransactionStack() {
         return threadTransactionStack.get();
+    }
+
+    /** The active write set for this thread. */
+    public static final ThreadLocal<WriteSetInfo> writeSet =
+            ThreadLocal.withInitial(WriteSetInfo::new);
+
+    /** Get the active write set for this thread. */
+    public static @Nonnull WriteSetInfo getWriteSet() {
+        return writeSet.get();
+    }
+
+    public static long addToWriteSet(ICorfuSMRProxyInternal proxy, SMREntry updateEntry,
+                                Object[] conflictObjects) {
+        return getWriteSet().add(proxy, updateEntry, conflictObjects);
+    }
+
+    /** Clear the current write set for this thread. */
+    public static void clearWriteSet() {
+        writeSet.remove();
+        writeSet.set(new WriteSetInfo());
     }
 
     /**

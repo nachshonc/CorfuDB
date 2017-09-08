@@ -20,7 +20,6 @@ import org.corfudb.runtime.exceptions.AbortCause;
 import org.corfudb.runtime.exceptions.TransactionAbortedException;
 import org.corfudb.runtime.exceptions.TrimmedException;
 import org.corfudb.runtime.object.ICorfuSMRAccess;
-import org.corfudb.runtime.object.ICorfuSMRProxy;
 import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
 import org.corfudb.runtime.object.VersionLockedObject;
 import org.corfudb.util.Utils;
@@ -240,6 +239,7 @@ public abstract class AbstractTransactionalContext implements
      */
     public void abortTransaction(TransactionAbortedException ae) {
         AbstractTransactionalContext.log.debug("TXAbort[{}]", this);
+        TransactionalContext.clearWriteSet();
         commitAddress = ABORTED_ADDRESS;
         completionFuture
                 .completeExceptionally(ae);

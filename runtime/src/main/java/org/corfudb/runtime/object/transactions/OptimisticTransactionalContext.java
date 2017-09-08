@@ -60,7 +60,8 @@ import javax.annotation.Nonnull;
  * <p>Created by mwei on 4/4/16.
  */
 @Slf4j
-public class OptimisticTransactionalContext extends AbstractTransactionalContext {
+public class OptimisticTransactionalContext extends
+        AbstractReadWriteTransactionalContext {
 
     /** The proxies which were modified by this transaction. */
     @Getter
@@ -144,7 +145,8 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
         addToReadSet(proxy, conflictObject);
 
         // if we have a result, return it.
-        SMREntry wrapper = getWriteSetEntryList(proxy.getStreamID()).get((int)timestamp);
+        SMREntry wrapper = TransactionalContext.getWriteSet().getWriteSet()
+                .getSMRUpdates(proxy.getStreamID()).get((int)timestamp);
         if (wrapper != null && wrapper.isHaveUpcallResult()) {
             return wrapper.getUpcallResult();
         }
@@ -152,14 +154,17 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
         return proxy.getUnderlyingObject().update(o -> {
             log.trace("Upcall[{}] {} Sync'd", this,  timestamp);
             syncWithRetryUnsafe(o, getSnapshotTimestamp(), proxy, this::setAsOptimisticStream);
-            SMREntry wrapper2 = getWriteSetEntryList(proxy.getStreamID()).get((int)timestamp);
+            SMREntry wrapper2 = TransactionalContext.getWriteSet().getWriteSet()
+                    .getSMRUpdates(proxy.getStreamID()).get((int)timestamp);
             if (wrapper2 != null && wrapper2.isHaveUpcallResult()) {
                 return wrapper2.getUpcallResult();
             }
             // If we still don't have the upcall, this must be a bug.
             throw new RuntimeException("Tried to get upcall during a transaction but"
                     + " we don't have it even after an optimistic sync (asked for " + timestamp
-                    + " we have 0-" + (getWriteSetEntryList(proxy.getStreamID()).size() - 1) + ")");
+                    + " we have " + (TransactionalContext.getWriteSet().getWriteSet()
+                    .getSMRUpdates(proxy.getStreamID()).size()) + ", stream is at "
+                    + proxy.getUnderlyingObject().getOptimisticStreamUnsafe().pos() + ")");
         });
     }
 
@@ -180,10 +185,8 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
             // Upon sync forward
             // the stream will replay every entries from all parent transactional context.
             WriteSetSMRStream newSmrStream =
-                    new WriteSetSMRStream(TransactionalContext.getTransactionStackAsList(),
-                    object.getID());
+                    new WriteSetSMRStream(TransactionalContext.getWriteSet(), object.getID());
 
-            newSmrStream.currentContext = 0;
             object.setOptimisticStreamUnsafe(newSmrStream);
         }
     }
@@ -206,8 +209,7 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
         log.trace("LogUpdate[{},{}] {} ({}) conflictObj={}",
                 this, proxy, updateEntry.getSMRMethod(),
                 updateEntry.getSMRArguments(), conflictObjects);
-
-        return addToWriteSet(proxy, updateEntry, conflictObjects);
+        return TransactionalContext.addToWriteSet(proxy, updateEntry, conflictObjects);
     }
 
     /**
@@ -221,9 +223,6 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
         log.trace("Merge[{}] adding {}", this, tc);
         // merge the conflict maps
         mergeReadSetInto(tc.getReadSetInfo());
-
-        // merge the write-sets
-        mergeWriteSetInto(tc.getWriteSetInfo());
 
         // "commit" the optimistic writes (for each proxy we touched)
         // by updating the modifying context (as long as the context
@@ -260,13 +259,16 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
 
         // If the write set is empty, we're done and just return
         // NOWRITE_ADDRESS.
-        if (getWriteSetInfo().getWriteSet().getEntryMap().isEmpty()) {
+        if (TransactionalContext.getWriteSet()
+                .getWriteSet().getEntryMap().isEmpty()) {
             log.trace("doCommit[{}] Read-only commit (no write)", this);
+            TransactionalContext.clearWriteSet();
             return NOWRITE_ADDRESS;
         }
 
         // Write to the transaction stream if transaction logging is enabled
-        Set<UUID> affectedStreams = new HashSet<>(getWriteSetInfo().getWriteSet()
+        Set<UUID> affectedStreams = new HashSet<>(TransactionalContext.getWriteSet()
+                .getWriteSet()
                 .getEntryMap().keySet());
         if (this.builder.runtime.getObjectsView().isTransactionLogging()) {
             affectedStreams.add(TRANSACTION_STREAM_ID);
@@ -282,7 +284,7 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
             address = this.builder.runtime.getStreamsView()
                     .append(
                             affectedStreams,
-                            collectWriteSetEntries(),
+                            TransactionalContext.getWriteSet().getWriteSet(),
                             new TxResolutionInfo(getTransactionID(),
                                     getSnapshotTimestamp(),
                                     hashedConflictSet,
@@ -297,6 +299,8 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
             // Otherwise, do a precise conflict check.
             address = doPreciseCommit(tae, conflictSet.getConflicts()
                     , hashedConflictSet, affectedStreams);
+        } finally {
+            TransactionalContext.clearWriteSet();
         }
 
         log.trace("doCommit[{}] Acquire address {}", this, address);

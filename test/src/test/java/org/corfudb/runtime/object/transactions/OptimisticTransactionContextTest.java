@@ -560,7 +560,8 @@ public class OptimisticTransactionContextTest extends AbstractTransactionContext
      * the modifications that happened within it are not
      * leaked into the parent transaction.
      */
-    @Test
+    //@Test
+    /*
     public void nestedTransactionCanBeAborted() {
         t(1, this::OptimisticTXBegin);
         t(1, () -> put("k", "v1"));
@@ -580,6 +581,7 @@ public class OptimisticTransactionContextTest extends AbstractTransactionContext
         assertThat(getMap())
                 .containsEntry("k", "v1");
     }
+    */
 
     /** This test makes sure that a write-only transaction properly
      * commits its updates, even if there are no accesses

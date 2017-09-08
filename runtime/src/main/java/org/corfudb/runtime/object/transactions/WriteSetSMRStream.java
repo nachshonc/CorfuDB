@@ -7,6 +7,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import javax.annotation.Nonnull;
+
 import lombok.extern.slf4j.Slf4j;
 
 import org.corfudb.protocols.logprotocol.SMREntry;
@@ -62,28 +64,22 @@ import org.corfudb.util.Utils;
 @SuppressWarnings("checkstyle:abbreviationaswordinname")
 public class WriteSetSMRStream implements ISMRStream {
 
-    List<AbstractTransactionalContext> contexts;
+    final WriteSetInfo writeSet;
 
-    int currentContext = 0;
-
-    // TODO add comment
-    long currentContextPos;
-
-    // TODO add comment
-    long writePos;
+    long pointer;
 
     // the specific stream-id for which this SMRstream wraps the write-set
     final UUID id;
 
     /**
      * Returns a new WriteSetSMRStream containing transactional contexts and stream id.
-     * @param contexts  list of transactional contexts
      * @param id  stream id
      */
-    public WriteSetSMRStream(List<AbstractTransactionalContext> contexts,
+    public WriteSetSMRStream(WriteSetInfo writeSet,
                              UUID id) {
-        this.contexts = contexts;
+        this.writeSet = writeSet;
         this.id = id;
+        this.pointer = Address.NEVER_READ;
         reset();
     }
 
@@ -96,8 +92,8 @@ public class WriteSetSMRStream implements ISMRStream {
      *          False otherwise.
      */
     public boolean isStreamCurrentContextThreadCurrentContext() {
-        return contexts.get(currentContext)
-                .equals(TransactionalContext.getCurrentContext());
+        return writeSet
+                .equals(TransactionalContext.getWriteSet());
     }
 
     /** Return whether we are the stream for this current thread
@@ -109,110 +105,70 @@ public class WriteSetSMRStream implements ISMRStream {
      *          False otherwise.
      */
     public boolean isStreamForThisThread() {
-        return contexts.get(0)
-                .equals(TransactionalContext.getRootContext());
+        return writeSet
+                .equals(TransactionalContext.getWriteSet());
     }
 
     void mergeTransaction() {
-        contexts.remove(contexts.size() - 1);
-        if (currentContext == contexts.size()) {
-            // recalculate the pos based on the write pointer
-            // TODO add explanation, code below very confusing!
-            long readPos = Address.maxNonAddress();
-            for (int i = 0; i < contexts.size(); i++) {
-                readPos += contexts.get(i).getWriteSetEntryList(id).size();
-                if (readPos >= writePos) {
-                    currentContextPos = contexts.get(i).getWriteSetEntryList(id).size()
-                                        - (writePos - readPos) - 1;
-                }
-            }
-            currentContext--;
-        }
     }
 
     @Override
-    public List<SMREntry> remainingUpTo(long maxGlobal) {
-        // Check for any new contexts
-        if (TransactionalContext.getTransactionStack().size()
-                > contexts.size()) {
-            contexts = TransactionalContext.getTransactionStackAsList();
-        } else if (TransactionalContext.getTransactionStack().size()
-                < contexts.size()) {
-            mergeTransaction();
+    public @Nonnull List<SMREntry> remainingUpTo(long maxGlobal) {
+        if (Address.nonAddress(maxGlobal)) {
+            return Collections.emptyList();
         }
-        List<SMREntry> entryList = new LinkedList<>();
+
+        List<SMREntry> updateList = writeSet.getWriteSet()
+                .getSMRUpdates(id);
 
 
-        for (int i = currentContext; i < contexts.size(); i++) {
-            final List<SMREntry> writeSet = contexts.get(i)
-                    .getWriteSetEntryList(id);
-            long readContextStart = i == currentContext ? currentContextPos + 1 : 0;
-            for (long j = readContextStart; j < writeSet.size(); j++) {
-                entryList.add(writeSet.get((int) j));
-                writePos++;
-            }
-            if (writeSet.size() > 0) {
-                currentContext = i;
-                currentContextPos = writeSet.size() - 1;
-            }
+        if (pointer >= updateList.size()) {
+            return Collections.emptyList();
         }
-        return entryList;
+
+        List<SMREntry> result = updateList.subList((int)pointer + 1,
+                (int) Math.min(maxGlobal, updateList.size()));
+        pointer = updateList.size() - 1;
+        return result;
     }
 
     @Override
     public List<SMREntry> current() {
-        if (Address.nonAddress(writePos)) {
+
+        List<SMREntry> updateList = writeSet.getWriteSet()
+                .getSMRUpdates(id);
+
+        if (updateList.size() == 0) {
             return null;
         }
-        if (Address.nonAddress(currentContextPos)) {
-            currentContextPos = -1;
+
+        if (Address.nonAddress(pointer)) {
+            return null;
         }
-        return Collections.singletonList(contexts
-                .get(currentContext)
-                .getWriteSetEntryList(id)
-                .get((int)(currentContextPos)));
+
+        return Collections
+                .singletonList(updateList.get((int)pointer));
     }
 
     @Override
     public List<SMREntry> previous() {
-        writePos--;
-
-        if (writePos <= Address.maxNonAddress()) {
-            writePos = Address.maxNonAddress();
-            return null;
+        if (Address.nonAddress(pointer)) {
+            throw new IllegalStateException("Attempt to rewind SMR stream past beginning");
         }
 
-        currentContextPos--;
-        // Pop the context if we're at the beginning of it
-        if (currentContextPos <= Address.maxNonAddress()) {
-            do {
-                if (currentContext == 0) {
-                    throw new RuntimeException(
-                            "Attempted to pop first context (pos=" + pos() + ")");
-                } else {
-                    currentContext--;
-                }
-            } while (contexts
-                    .get(currentContext)
-                    .getWriteSetEntrySize(id) == 0);
-            currentContextPos = contexts
-                    .get(currentContext)
-                    .getWriteSetEntrySize(id) - 1 ;
-        }
+        pointer--;
 
         return current();
     }
 
     @Override
     public long pos() {
-        return writePos;
+        return pointer;
     }
 
     @Override
     public void reset() {
-        writePos = Address.maxNonAddress();
-        currentContext = 0;
-        currentContextPos = Address.maxNonAddress();
+        pointer = Address.NEVER_READ;
     }
 
     @Override
