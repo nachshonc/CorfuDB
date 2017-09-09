@@ -106,8 +106,11 @@ public class OptimisticTransactionalContext extends
                 .getUnderlyingObject()
                 .access(o -> {
                             WriteSetSMRStream stream = o.getOptimisticStreamUnsafe();
-                            return (
-                                getWriteSetEntrySize(proxy.getStreamID()) == 0 && // No updates
+                            return ((TransactionalContext.getWriteSet().getWriteSet()
+                                    .getSMRUpdates(proxy.getStreamID()) == null
+                                    || TransactionalContext.getWriteSet().getWriteSet()
+                                            .getSMRUpdates(proxy.getStreamID()).size() == 0)
+                                    && // No updates
                                         // And at the correct timestamp
                                         o.getVersionUnsafe() == getSnapshotTimestamp()
                                         && (stream == null
@@ -288,7 +291,8 @@ public class OptimisticTransactionalContext extends
                             new TxResolutionInfo(getTransactionID(),
                                     getSnapshotTimestamp(),
                                     hashedConflictSet,
-                                    getWriteSetInfo().getHashedConflictSet())
+                                    TransactionalContext.getWriteSet()
+                                            .getHashedConflictSet())
                     );
         } catch (TransactionAbortedException tae) {
             // If precise conflicts aren't required, re-throw the transaction.
@@ -361,7 +365,7 @@ public class OptimisticTransactionalContext extends
             } else {
                 modifyProxy = getReadSetInfo().getProxy(conflictStream);
                 if (!modifyProxy.isPresent()) {
-                    modifyProxy = getWriteSetInfo().getProxy(conflictStream);
+                    modifyProxy = TransactionalContext.getWriteSet().getProxy(conflictStream);
                     if (!modifyProxy.isPresent()) {
                         log.warn("doPreciseCommit[{}]: precise conflict resolution requested "
                                 + "but proxy not found, aborting", this);
@@ -438,11 +442,12 @@ public class OptimisticTransactionalContext extends
                 return this.builder.runtime.getStreamsView()
                         .append(
                                 affectedStreams,
-                                collectWriteSetEntries(),
+                                TransactionalContext.getWriteSet().getWriteSet(),
                                 new TxResolutionInfo(getTransactionID(),
                                         getSnapshotTimestamp(),
                                         hashedConflictSet,
-                                        getWriteSetInfo().getHashedConflictSet(),
+                                        TransactionalContext.getWriteSet()
+                                        .getHashedConflictSet(),
                                         verifiedStreams
                                 )
                         );
@@ -481,7 +486,8 @@ public class OptimisticTransactionalContext extends
             // for this to work the write sets better
             // be the same
             List<SMREntry> committedWrites =
-                    getWriteSetEntryList(x.getStreamID());
+                    TransactionalContext.getWriteSet().getWriteSet()
+                        .getSMRUpdates(x.getStreamID());
             List<SMREntry> entryWrites =
                     ((ISMRConsumable) committedEntry
                             .getPayload(this.getBuilder().runtime))

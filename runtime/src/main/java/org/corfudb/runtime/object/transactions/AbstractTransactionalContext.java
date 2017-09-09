@@ -117,9 +117,6 @@ public abstract class AbstractTransactionalContext implements
     private final AbstractTransactionalContext parentContext;
 
     @Getter
-    private final WriteSetInfo writeSetInfo = new WriteSetInfo();
-
-    @Getter
     private final ConflictSetInfo readSetInfo = new ConflictSetInfo();
 
     /**
@@ -265,63 +262,6 @@ public abstract class AbstractTransactionalContext implements
      */
     void mergeReadSetInto(ConflictSetInfo other) {
         getReadSetInfo().mergeInto(other);
-    }
-
-    /**
-     * Add an update to the transaction optimistic write-set.
-     *
-     * @param proxy           the SMR object for this update
-     * @param updateEntry     the update
-     * @param conflictObjects the conflict objects to add
-     * @return a synthetic "address" in the write-set, to be used for
-     *     checking upcall results
-     */
-    long addToWriteSet(ICorfuSMRProxyInternal proxy, SMREntry updateEntry, Object[]
-            conflictObjects) {
-        return getWriteSetInfo().add(proxy, updateEntry, conflictObjects);
-    }
-
-    /**
-     * collect all the conflict-params from the write-set for this transaction
-     * into a set.
-     *
-     * @return A set of longs representing all the conflict params
-     */
-    Map<UUID, Set<byte[]>> collectWriteConflictParams() {
-        return getWriteSetInfo().getHashedConflictSet();
-    }
-
-    void mergeWriteSetInto(WriteSetInfo other) {
-        getWriteSetInfo().mergeInto(other);
-    }
-
-    /**
-     * convert our write set into a new MultiObjectSMREntry.
-     *
-     * @return  the write set
-     */
-    MultiObjectSMREntry collectWriteSetEntries() {
-        return getWriteSetInfo().getWriteSet();
-    }
-
-    /**
-     * Helper function to get a write set for a particular stream.
-     *
-     * @param id The stream to get a append set for.
-     * @return The append set for that stream, as an ordered list.
-     */
-    List<SMREntry> getWriteSetEntryList(UUID id) {
-        return getWriteSetInfo().getWriteSet().getSMRUpdates(id);
-    }
-
-    int getWriteSetEntrySize(UUID id) {
-        List<SMREntry> entries = getWriteSetInfo().getWriteSet().getSMRUpdates(id);
-
-        if (entries == null) {
-            return 0;
-        } else {
-            return entries.size();
-        }
     }
 
     /**
