@@ -67,6 +67,19 @@ public class TransactionalContext {
         writeSet.set(new WriteSetInfo());
     }
 
+    public static @Nonnull ConflictSetInfo getConflictSet() {
+        return conflictSet.get();
+    }
+
+    /** The active conflict set for this thread. */
+    public static final ThreadLocal<ConflictSetInfo> conflictSet =
+            ThreadLocal.withInitial(ConflictSetInfo::new);
+
+    public static void clearConflictSet() {
+        conflictSet.remove();
+        conflictSet.set(new ConflictSetInfo());
+    }
+
     /**
      * Returns the current transactional context for the calling thread.
      *

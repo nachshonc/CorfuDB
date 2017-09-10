@@ -1,8 +1,5 @@
 package org.corfudb.runtime.object.transactions;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -13,7 +10,6 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
-import org.corfudb.protocols.logprotocol.MultiObjectSMREntry;
 import org.corfudb.protocols.logprotocol.SMREntry;
 import org.corfudb.protocols.wireprotocol.TxResolutionInfo;
 import org.corfudb.runtime.exceptions.AbortCause;
@@ -116,9 +112,6 @@ public abstract class AbstractTransactionalContext implements
     @Getter
     private final AbstractTransactionalContext parentContext;
 
-    @Getter
-    private final ConflictSetInfo readSetInfo = new ConflictSetInfo();
-
     /**
      * A future which gets completed when this transaction commits.
      * It is completed exceptionally when the transaction aborts.
@@ -194,7 +187,7 @@ public abstract class AbstractTransactionalContext implements
                                             snapshotTimestamp), null,
                                     proxy.getStreamID(),
                                     AbortCause.TRIM, te, this);
-                    abortTransaction(tae);
+                    abort(tae);
                     throw tae;
                 }
             }
@@ -214,19 +207,11 @@ public abstract class AbstractTransactionalContext implements
                                        Object[] conflictObject);
 
     /**
-     * Add a given transaction to this transactional context, merging
-     * the read and write sets.
-     *
-     * @param tc The transactional context to merge.
-     */
-    public abstract void addTransaction(AbstractTransactionalContext tc);
-
-    /**
      * Commit the transaction to the log.
      *
      * @throws TransactionAbortedException If the transaction is aborted.
      */
-    public long commitTransaction() throws TransactionAbortedException {
+    public long commit() throws TransactionAbortedException {
         completionFuture.complete(true);
         return NOWRITE_ADDRESS;
     }
@@ -234,35 +219,16 @@ public abstract class AbstractTransactionalContext implements
     /**
      * Forcefully abort the transaction.
      */
-    public void abortTransaction(TransactionAbortedException ae) {
-        AbstractTransactionalContext.log.debug("TXAbort[{}]", this);
+    public void abort(TransactionAbortedException ae) {
+        AbstractTransactionalContext.log.debug("abort[{}]", this);
         TransactionalContext.clearWriteSet();
+        TransactionalContext.clearConflictSet();
         commitAddress = ABORTED_ADDRESS;
         completionFuture
                 .completeExceptionally(ae);
     }
 
     public abstract long obtainSnapshotTimestamp();
-
-    /**
-     * Add the proxy and conflict-params information to our read set.
-     *
-     * @param proxy           The proxy to add
-     * @param conflictObjects The fine-grained conflict information, if
-     *                        available.
-     */
-    public void addToReadSet(ICorfuSMRProxyInternal proxy, Object[] conflictObjects) {
-        getReadSetInfo().add(proxy, conflictObjects);
-    }
-
-    /**
-     * Merge another readSet into this one.
-     *
-     * @param other  Source readSet to merge in
-     */
-    void mergeReadSetInto(ConflictSetInfo other) {
-        getReadSetInfo().mergeInto(other);
-    }
 
     /**
      * Transactions are ordered by their snapshot timestamp.

@@ -85,11 +85,6 @@ public class SnapshotTransactionalContext extends AbstractTransactionalContext {
     }
 
     @Override
-    public void addTransaction(AbstractTransactionalContext tc) {
-        throw new UnsupportedOperationException("Can't merge into a readonly txn (yet)");
-    }
-
-    @Override
     public long obtainSnapshotTimestamp() {
         return getBuilder().getSnapshot();
     }

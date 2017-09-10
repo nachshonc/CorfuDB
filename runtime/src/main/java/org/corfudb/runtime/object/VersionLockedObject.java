@@ -17,7 +17,7 @@ import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.logprotocol.SMREntry;
 import org.corfudb.runtime.exceptions.NoRollbackException;
-import org.corfudb.runtime.object.transactions.WriteSetSMRStream;
+import org.corfudb.runtime.object.transactions.WriteSetSmrStream;
 import org.corfudb.runtime.view.Address;
 import org.corfudb.util.Utils;
 
@@ -84,7 +84,7 @@ public class VersionLockedObject<T> {
     /**
      * The optimistic SMR stream on this object, if any.
      */
-    private WriteSetSMRStream optimisticStream;
+    private WriteSetSmrStream optimisticStream;
 
     /**
      * The upcall map for this object.
@@ -286,7 +286,7 @@ public class VersionLockedObject<T> {
         if (optimisticallyOwnedByThreadUnsafe()) {
             // If there are no updates, ensure we are at the right snapshot
             if (optimisticStream.pos() == Address.NEVER_READ) {
-                final WriteSetSMRStream currentOptimisticStream =
+                final WriteSetSmrStream currentOptimisticStream =
                         optimisticStream;
                 // If we are too far ahead, roll back to the past
                 if (getVersionUnsafe() > timestamp) {
@@ -358,7 +358,7 @@ public class VersionLockedObject<T> {
     /**
      * Get a handle to the optimistic stream.
      */
-    public WriteSetSMRStream getOptimisticStreamUnsafe() {
+    public WriteSetSmrStream getOptimisticStreamUnsafe() {
         return optimisticStream;
     }
 
@@ -376,7 +376,7 @@ public class VersionLockedObject<T> {
      * @return True, if the object was modified by this thread. False otherwise.
      */
     public boolean optimisticallyOwnedByThreadUnsafe() {
-        WriteSetSMRStream optimisticStream = this.optimisticStream;
+        WriteSetSmrStream optimisticStream = this.optimisticStream;
 
         return optimisticStream == null ? false : optimisticStream.isStreamForThisThread();
     }
@@ -387,7 +387,7 @@ public class VersionLockedObject<T> {
      *
      * @param optimisticStream The new optimistic stream to install.
      */
-    public void setOptimisticStreamUnsafe(WriteSetSMRStream optimisticStream) {
+    public void setOptimisticStreamUnsafe(WriteSetSmrStream optimisticStream) {
         if (this.optimisticStream != null) {
             optimisticRollbackUnsafe();
         }
@@ -442,7 +442,7 @@ public class VersionLockedObject<T> {
      */
     @Override
     public String toString() {
-        WriteSetSMRStream optimisticStream = this.optimisticStream;
+        WriteSetSmrStream optimisticStream = this.optimisticStream;
 
         return object.getClass().getSimpleName()
                 + "[" + Utils.toReadableId(smrStream.getID()) + "]@"

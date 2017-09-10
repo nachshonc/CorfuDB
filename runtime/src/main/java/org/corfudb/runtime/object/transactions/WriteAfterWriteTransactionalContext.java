@@ -1,6 +1,8 @@
 package org.corfudb.runtime.object.transactions;
 
 import lombok.extern.slf4j.Slf4j;
+
+import org.corfudb.protocols.logprotocol.SMREntry;
 import org.corfudb.runtime.exceptions.TransactionAbortedException;
 import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
 
@@ -21,7 +23,7 @@ import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
  */
 @Slf4j
 public class WriteAfterWriteTransactionalContext
-        extends OptimisticTransactionalContext {
+        extends AbstractOptimisticTransactionalContext {
 
     WriteAfterWriteTransactionalContext(TransactionBuilder builder) {
         super(builder);
@@ -29,20 +31,11 @@ public class WriteAfterWriteTransactionalContext
     }
 
     @Override
-    public long commitTransaction() throws TransactionAbortedException {
-        log.debug("TX[{}] request write-write commit", this);
-
-        return doCommit(TransactionalContext.getWriteSet());
+    protected <T> long addToWriteSet(ICorfuSMRProxyInternal<T> proxy,
+                                     SMREntry updateEntry,
+                                     Object[] conflictObject) {
+        TransactionalContext.getConflictSet().add(proxy, conflictObject);
+        return super.addToWriteSet(proxy, updateEntry, conflictObject);
     }
 
-    @Override
-    /** Add the proxy and conflict-params information to our read set.
-     * @param proxy             The proxy to add
-     * @param conflictObjects    The fine-grained conflict information, if
-     *                          available.
-     */
-    public void addToReadSet(ICorfuSMRProxyInternal proxy, Object[] conflictObjects) {
-        // do nothing! write-write conflict TXs do not need to keep track of
-        // read sets.
-    }
 }

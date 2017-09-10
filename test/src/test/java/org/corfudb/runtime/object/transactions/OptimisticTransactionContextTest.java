@@ -61,8 +61,7 @@ public class OptimisticTransactionContextTest extends AbstractTransactionContext
         testObject.mutatorAccessorTest(TEST_4, TEST_5);
 
         // Assert that the conflict set contains TEST_0, TEST_4
-        assertThat(TransactionalContext.getCurrentContext()
-                .getReadSetInfo().getConflicts()
+        assertThat(TransactionalContext.getConflictSet().getConflicts()
                 .values()
                 .stream()
                 .flatMap(x -> x.stream())
@@ -70,8 +69,7 @@ public class OptimisticTransactionContextTest extends AbstractTransactionContext
                 .contains(TEST_0, TEST_4);
 
         // in optimistic mode, assert that the conflict set does NOT contain TEST_1 - TEST_3
-        assertThat(TransactionalContext.getCurrentContext()
-                .getReadSetInfo()
+        assertThat(TransactionalContext.getConflictSet()
                 .getConflicts().values().stream()
                 .flatMap(x -> x.stream())
                 .collect(Collectors.toList()))

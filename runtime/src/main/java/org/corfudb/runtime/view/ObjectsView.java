@@ -143,7 +143,7 @@ public class ObjectsView extends AbstractView {
         } else {
             TxResolutionInfo txInfo = new TxResolutionInfo(
                     context.getTransactionID(), context.getSnapshotTimestamp());
-            context.abortTransaction(new TransactionAbortedException(
+            context.abort(new TransactionAbortedException(
                     txInfo, null, AbortCause.USER, context));
             TransactionalContext.removeContext();
         }
@@ -179,10 +179,10 @@ public class ObjectsView extends AbstractView {
             log.trace("TXCommit[{}] time={} ms",
                     context, totalTime);
             try {
-                return TransactionalContext.getCurrentContext().commitTransaction();
+                return TransactionalContext.getCurrentContext().commit();
             } catch (TransactionAbortedException e) {
                 log.warn("TXCommit[{}] Exception {}", context, e);
-                TransactionalContext.getCurrentContext().abortTransaction(e);
+                TransactionalContext.getCurrentContext().abort(e);
                 throw e;
             } catch (Exception e) {
                 log.warn("TXCommit[{}] Exception {}", context, e);
@@ -205,7 +205,7 @@ public class ObjectsView extends AbstractView {
                         snapshotTimestamp);
                 TransactionAbortedException tae = new TransactionAbortedException(txInfo,
                         null, null, abortCause, e, context);
-                context.abortTransaction(tae);
+                context.abort(tae);
                 throw tae;
             } finally {
                 TransactionalContext.removeContext();

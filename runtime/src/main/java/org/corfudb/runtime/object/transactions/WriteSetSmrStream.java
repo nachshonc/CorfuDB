@@ -50,19 +50,18 @@ import org.corfudb.util.Utils;
  *
  * <p>RemainingUpTo() returns a list of entries.
  *
- * <p>WriteSetSMRStream does not support the full API - neither append nor seek are
+ * <p>WriteSetSmrStream does not support the full API - neither append nor seek are
  * supported.
  *
  * <p>Enter nested transactions.
  *
- * <p>WriteSetSMRStream maintains the abstractions also across nested transactions.
+ * <p>WriteSetSmrStream maintains the abstractions also across nested transactions.
  * It supports navigating forward/backward across the SMREntries in the entire transcation stack.
  *
  */
 @Slf4j
-@Deprecated
 @SuppressWarnings("checkstyle:abbreviationaswordinname")
-public class WriteSetSMRStream implements ISMRStream {
+public class WriteSetSmrStream implements ISMRStream {
 
     final WriteSetInfo writeSet;
 
@@ -72,10 +71,10 @@ public class WriteSetSMRStream implements ISMRStream {
     final UUID id;
 
     /**
-     * Returns a new WriteSetSMRStream containing transactional contexts and stream id.
+     * Returns a new WriteSetSmrStream containing transactional contexts and stream id.
      * @param id  stream id
      */
-    public WriteSetSMRStream(WriteSetInfo writeSet,
+    public WriteSetSmrStream(WriteSetInfo writeSet,
                              UUID id) {
         this.writeSet = writeSet;
         this.id = id;
@@ -107,9 +106,6 @@ public class WriteSetSMRStream implements ISMRStream {
     public boolean isStreamForThisThread() {
         return writeSet
                 .equals(TransactionalContext.getWriteSet());
-    }
-
-    void mergeTransaction() {
     }
 
     @Override

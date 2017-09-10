@@ -376,7 +376,7 @@ public class CorfuCompileProxy<T> implements ICorfuSMRProxyInternal<T> {
                 log.warn("TXExecute[{}] Abort with exception {}", this, e);
                 if (e.getAbortCause() == AbortCause.NETWORK) {
                     if (TransactionalContext.getCurrentContext() != null) {
-                        TransactionalContext.getCurrentContext().abortTransaction(e);
+                        TransactionalContext.getCurrentContext().abort(e);
                         TransactionalContext.removeContext();
                         throw e;
                     }
@@ -498,7 +498,7 @@ public class CorfuCompileProxy<T> implements ICorfuSMRProxyInternal<T> {
                 snapshotTimestamp = context.getSnapshotTimestamp();
                 abortCause = AbortCause.UNSUPPORTED;
             } else {
-                log.error("abortTransaction[{}] Abort Transaction with Exception {}", this, e);
+                log.error("abort[{}] Abort Transaction with Exception {}", this, e);
                 snapshotTimestamp = context.getSnapshotTimestamp();
                 abortCause = AbortCause.UNDEFINED;
             }
@@ -507,7 +507,7 @@ public class CorfuCompileProxy<T> implements ICorfuSMRProxyInternal<T> {
                     context.getTransactionID(), snapshotTimestamp);
             tae = new TransactionAbortedException(txInfo, null, getStreamID(),
                     abortCause, e, context);
-            context.abortTransaction(tae);
+            context.abort(tae);
         }
 
         TransactionalContext.removeContext();
