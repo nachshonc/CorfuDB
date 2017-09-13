@@ -301,6 +301,7 @@ public abstract class AbstractQueuedStreamView extends
             context.globalPointer = prevAddress == null ? Address.NEVER_READ :
                                                 prevAddress - 1L;
             remainingUpTo(context.minResolution);
+            // should not terminate prematurely
             context.minResolution = Address.NON_ADDRESS;
             context.globalPointer = oldPointer;
             prevAddress = context
@@ -308,12 +309,14 @@ public abstract class AbstractQueuedStreamView extends
             log.trace("Previous[{}] updated queue {}, ptr={}, prev={}", this, context.resolvedQueue,
                     context.globalPointer, prevAddress);
         }
+        // Clear the read queue
+        context.readQueue.clear();
+
         // If still null, we're done.
         if (prevAddress == null) {
             return null;
         }
-        // Add the current pointer back into the read queue
-        context.readQueue.add(oldPointer);
+
         // Update the global pointer
         context.globalPointer = prevAddress;
         return read(prevAddress);
