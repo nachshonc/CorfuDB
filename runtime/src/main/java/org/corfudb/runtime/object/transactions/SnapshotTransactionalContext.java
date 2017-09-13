@@ -25,12 +25,6 @@ import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
  */
 public class SnapshotTransactionalContext extends AbstractTransactionalContext {
 
-    /** In a snapshot transaction, no proxies are ever modified.
-     *
-     */
-    @Getter
-    private Set<ICorfuSMRProxyInternal> modifiedProxies = ImmutableSet.of();
-
     public SnapshotTransactionalContext(TransactionBuilder builder) {
         super(builder);
     }

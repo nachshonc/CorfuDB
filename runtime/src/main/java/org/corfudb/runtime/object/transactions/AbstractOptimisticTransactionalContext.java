@@ -10,9 +10,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
@@ -61,12 +61,6 @@ import javax.annotation.Nonnull;
 public abstract class AbstractOptimisticTransactionalContext extends
         AbstractTransactionalContext {
 
-    /** The proxies which were modified by this transaction. */
-    @Getter
-    private final Set<ICorfuSMRProxyInternal> modifiedProxies =
-            new HashSet<>();
-
-
     AbstractOptimisticTransactionalContext(TransactionBuilder builder) {
         super(builder);
     }
@@ -77,7 +71,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
     protected <T> long addToWriteSet(ICorfuSMRProxyInternal<T> proxy,
                                        SMREntry updateEntry,
                                        Object[] conflictObject) {
-        return TransactionalContext.getWriteSet().add(proxy, updateEntry, conflictObject);
+        return Transactions.getContext().getWriteSet().add(proxy, updateEntry, conflictObject);
     }
 
     /**
@@ -111,15 +105,15 @@ public abstract class AbstractOptimisticTransactionalContext extends
                 .getUnderlyingObject()
                 .access(o -> {
                             WriteSetSmrStream stream = o.getOptimisticStreamUnsafe();
-                            return ((TransactionalContext.getWriteSet().getWriteSet()
+                            return ((Transactions.getContext().getWriteSet().getWriteSet()
                                     .getSMRUpdates(proxy.getStreamID()) == null
-                                    || TransactionalContext.getWriteSet().getWriteSet()
+                                    || Transactions.getContext().getWriteSet().getWriteSet()
                                             .getSMRUpdates(proxy.getStreamID()).size() == 0)
                                     && // No updates
                                         // And at the correct timestamp
                                         o.getVersionUnsafe() == getSnapshotTimestamp()
                                         && (stream == null
-                                            || stream.isStreamCurrentContextThreadCurrentContext())
+                                            || stream.isStreamForThisThread())
                             ); },
                         o -> {
                             // inside syncObjectUnsafe, depending on the object
@@ -153,7 +147,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
         addToReadSet(proxy, conflictObject);
 
         // if we have a result, return it.
-        SMREntry wrapper = TransactionalContext.getWriteSet().getWriteSet()
+        SMREntry wrapper = Transactions.getContext().getWriteSet().getWriteSet()
                 .getSMRUpdates(proxy.getStreamID()).get((int)timestamp);
         if (wrapper != null && wrapper.isHaveUpcallResult()) {
             return wrapper.getUpcallResult();
@@ -162,7 +156,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
         return proxy.getUnderlyingObject().update(o -> {
             log.trace("Upcall[{}] {} Sync'd", this,  timestamp);
             syncWithRetryUnsafe(o, getSnapshotTimestamp(), proxy, this::setAsOptimisticStream);
-            SMREntry wrapper2 = TransactionalContext.getWriteSet().getWriteSet()
+            SMREntry wrapper2 = Transactions.getContext().getWriteSet().getWriteSet()
                     .getSMRUpdates(proxy.getStreamID()).get((int)timestamp);
             if (wrapper2 != null && wrapper2.isHaveUpcallResult()) {
                 return wrapper2.getUpcallResult();
@@ -170,7 +164,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
             // If we still don't have the upcall, this must be a bug.
             throw new RuntimeException("Tried to get upcall during a transaction but"
                     + " we don't have it even after an optimistic sync (asked for " + timestamp
-                    + " we have " + (TransactionalContext.getWriteSet().getWriteSet()
+                    + " we have " + (Transactions.getContext().getWriteSet().getWriteSet()
                     .getSMRUpdates(proxy.getStreamID()).size()) + ", stream is at "
                     + proxy.getUnderlyingObject().getOptimisticStreamUnsafe().pos() + ")");
         });
@@ -187,13 +181,13 @@ public abstract class AbstractOptimisticTransactionalContext extends
     <T> void setAsOptimisticStream(VersionLockedObject<T> object) {
         WriteSetSmrStream stream = object.getOptimisticStreamUnsafe();
         if (stream == null
-                || !stream.isStreamCurrentContextThreadCurrentContext()) {
+                || !stream.isStreamForThisThread()) {
 
             // We are setting the current context to the root context of nested transactions.
             // Upon sync forward
             // the stream will replay every entries from all parent transactional context.
             WriteSetSmrStream newSmrStream =
-                    new WriteSetSmrStream(TransactionalContext.getWriteSet(), object.getID());
+                    new WriteSetSmrStream(Transactions.getContext().getWriteSet(), object.getID());
 
             object.setOptimisticStreamUnsafe(newSmrStream);
         }
@@ -229,26 +223,22 @@ public abstract class AbstractOptimisticTransactionalContext extends
     @Override
     @SuppressWarnings("unchecked")
     public long commit() throws TransactionAbortedException {
-        log.debug("commit[{}] request commit", this);
-
-        if (TransactionalContext.isInNestedTransaction()) {
+        if (Transactions.isNested()) {
             commitAddress = AbstractTransactionalContext.FOLDED_ADDRESS;
-            log.trace("commit[{}] Folded into {}", this, getParentContext());
+            log.trace("commit[{}] Nested transaction folded", this);
             return commitAddress;
         }
 
         // If the write set is empty, we're done and just return
         // NOWRITE_ADDRESS.
-        if (TransactionalContext.getWriteSet()
+        if (Transactions.getContext().getWriteSet()
                 .getWriteSet().getEntryMap().isEmpty()) {
             log.trace("commit[{}] Read-only commit (no write)", this);
-            TransactionalContext.clearWriteSet();
-            TransactionalContext.clearConflictSet();
             return NOWRITE_ADDRESS;
         }
 
         // Write to the transaction stream if transaction logging is enabled
-        Set<UUID> affectedStreams = new HashSet<>(TransactionalContext.getWriteSet()
+        Set<UUID> affectedStreams = new HashSet<>(Transactions.getContext().getWriteSet()
                 .getWriteSet()
                 .getEntryMap().keySet());
         if (this.builder.runtime.getObjectsView().isTransactionLogging()) {
@@ -260,16 +250,16 @@ public abstract class AbstractOptimisticTransactionalContext extends
         long address;
 
         final Map<UUID, Set<byte[]>> hashedConflictSet =
-                TransactionalContext.getConflictSet().getHashedConflictSet();
+                Transactions.getContext().getConflictSet().getHashedConflictSet();
         try {
             address = this.builder.runtime.getStreamsView()
                     .append(
                             affectedStreams,
-                            TransactionalContext.getWriteSet().getWriteSet(),
+                            Transactions.getContext().getWriteSet().getWriteSet(),
                             new TxResolutionInfo(getTransactionID(),
                                     getSnapshotTimestamp(),
                                     hashedConflictSet,
-                                    TransactionalContext.getWriteSet()
+                                    Transactions.getContext().getWriteSet()
                                             .getHashedConflictSet())
                     );
         } catch (TransactionAbortedException tae) {
@@ -279,11 +269,8 @@ public abstract class AbstractOptimisticTransactionalContext extends
             }
 
             // Otherwise, do a precise conflict check.
-            address = preciseCommit(tae, TransactionalContext.getConflictSet().getConflicts()
+            address = preciseCommit(tae, Transactions.getContext().getConflictSet().getConflicts()
                     , hashedConflictSet, affectedStreams);
-        } finally {
-            TransactionalContext.clearWriteSet();
-            TransactionalContext.clearConflictSet();
         }
 
         log.trace("commit[{}] Acquire address {}", this, address);
@@ -293,6 +280,26 @@ public abstract class AbstractOptimisticTransactionalContext extends
 
         tryCommitAllProxies();
         log.trace("commit[{}] Written to {}", this, address);
+        try {
+            log.trace("commit WS: {}",
+                    Transactions.getContext().getWriteSet()
+                            .getWriteSet().getEntryMap().entrySet().stream()
+                            .map(e -> Utils.toReadableId(e.getKey()) + ":" + e.getValue()
+                                    .getUpdates().stream().map(u -> {
+                                        if (u == null || u.getSMRArguments() == null) {
+                                            return "[]";
+                                        } else {
+                                            return Arrays.stream(u.getSMRArguments())
+                                                    .map(ox -> ox == null ? "" : ox.toString())
+                                                    .collect(Collectors.joining(","));
+                                        }
+                                    })
+                                    .collect(Collectors.joining(",")))
+                            .collect(Collectors.joining(","))
+            );
+        } catch (Exception ex) {
+
+        }
         return address;
     }
 
@@ -336,15 +343,18 @@ public abstract class AbstractOptimisticTransactionalContext extends
             // or read set. We need the proxy to generate the conflict objects
             // from the SMR entry.
             ICorfuSMRProxyInternal proxy;
-            Optional<ICorfuSMRProxyInternal> modifyProxy = getModifiedProxies().stream()
+            Optional<ICorfuSMRProxyInternal> modifyProxy =
+                    Transactions.getContext().getWriteSet()
+                    .getConflicts().keySet()
+                    .stream()
                     .filter(p -> p.getStreamID().equals(conflictStream))
                     .findFirst();
             if (modifyProxy.isPresent()) {
                 proxy = modifyProxy.get();
             } else {
-                modifyProxy = TransactionalContext.getConflictSet().getProxy(conflictStream);
+                modifyProxy = Transactions.getContext().getConflictSet().getProxy(conflictStream);
                 if (!modifyProxy.isPresent()) {
-                    modifyProxy = TransactionalContext.getWriteSet().getProxy(conflictStream);
+                    modifyProxy = Transactions.getContext().getWriteSet().getProxy(conflictStream);
                     if (!modifyProxy.isPresent()) {
                         log.warn("preciseCommit[{}]: precise conflict resolution requested "
                                 + "but proxy not found, aborting", this);
@@ -421,11 +431,11 @@ public abstract class AbstractOptimisticTransactionalContext extends
                 return this.builder.runtime.getStreamsView()
                         .append(
                                 affectedStreams,
-                                TransactionalContext.getWriteSet().getWriteSet(),
+                                Transactions.getContext().getWriteSet().getWriteSet(),
                                 new TxResolutionInfo(getTransactionID(),
                                         getSnapshotTimestamp(),
                                         hashedConflictSet,
-                                        TransactionalContext.getWriteSet()
+                                        Transactions.getContext().getWriteSet()
                                         .getHashedConflictSet(),
                                         verifiedStreams
                                 )
@@ -465,7 +475,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
             // for this to work the write sets better
             // be the same
             List<SMREntry> committedWrites =
-                    TransactionalContext.getWriteSet().getWriteSet()
+                    Transactions.getContext().getWriteSet().getWriteSet()
                         .getSMRUpdates(x.getStreamID());
             List<SMREntry> entryWrites =
                     ((ISMRConsumable) committedEntry
@@ -492,7 +502,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
 
     @SuppressWarnings("unchecked")
     protected void updateAllProxies(Consumer<ICorfuSMRProxyInternal> function) {
-        getModifiedProxies().forEach(x -> {
+        Transactions.getContext().getWriteSet().getConflicts().keySet().forEach(x -> {
             // If we are on the same thread, this will hold true.
             if (x.getUnderlyingObject()
                     .optimisticallyOwnedByThreadUnsafe()) {
@@ -509,19 +519,6 @@ public abstract class AbstractOptimisticTransactionalContext extends
         });
     }
 
-    /** Get the root context (the first context of a nested txn)
-     * which must be an optimistic transactional context.
-     * @return  The root context.
-     */
-    private OptimisticTransactionalContext getRootContext() {
-        AbstractTransactionalContext atc = TransactionalContext.getRootContext();
-        if (atc != null && !(atc instanceof OptimisticTransactionalContext)) {
-            throw new RuntimeException("Attempted to nest two different "
-                    + "transactional context types");
-        }
-        return (OptimisticTransactionalContext)atc;
-    }
-
     /**
      * Get the first timestamp for this transaction.
      *
@@ -529,11 +526,10 @@ public abstract class AbstractOptimisticTransactionalContext extends
      */
     @Override
     public synchronized long obtainSnapshotTimestamp() {
-        final AbstractTransactionalContext atc = getRootContext();
-        if (atc != null && atc != this) {
+        if (Transactions.isNested()) {
             // If we're in a nested transaction, the first read timestamp
             // needs to come from the root.
-            return atc.getSnapshotTimestamp();
+            return Transactions.getContext().getOptimisticSnapshot();
         } else {
             // Otherwise, fetch a read token from the sequencer the linearize
             // ourselves against.
@@ -541,6 +537,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
                     .getSequencerView().nextToken(Collections.emptySet(),
                             0).getToken().getTokenValue();
             log.trace("SnapshotTimestamp[{}] {}", this, currentTail);
+            Transactions.getContext().optimisticSnapshot = currentTail;
             return currentTail;
         }
     }

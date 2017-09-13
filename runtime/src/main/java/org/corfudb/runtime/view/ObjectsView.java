@@ -24,6 +24,7 @@ import org.corfudb.runtime.object.transactions.AbstractTransactionalContext;
 import org.corfudb.runtime.object.transactions.TransactionBuilder;
 import org.corfudb.runtime.object.transactions.TransactionType;
 import org.corfudb.runtime.object.transactions.TransactionalContext;
+import org.corfudb.runtime.object.transactions.Transactions;
 import org.corfudb.runtime.view.stream.IStreamView;
 import org.corfudb.util.serializer.Serializers;
 
@@ -110,12 +111,6 @@ public class ObjectsView extends AbstractView {
     public void TXBegin() {
         TransactionType type = TransactionType.OPTIMISTIC;
 
-        /* If it is a nested transaction, inherit type of parent */
-        if (TransactionalContext.isInTransaction()) {
-            type = TransactionalContext.getCurrentContext().getBuilder().getType();
-            log.trace("Inheriting parent's transaction type {}", type);
-        }
-
         TXBuild()
                 .setType(type)
                 .begin();
@@ -137,16 +132,7 @@ public class ObjectsView extends AbstractView {
      */
     @SuppressWarnings({"checkstyle:methodname", "checkstyle:abbreviation"})
     public void TXAbort() {
-        AbstractTransactionalContext context = TransactionalContext.getCurrentContext();
-        if (context == null) {
-            log.warn("Attempted to abort a transaction, but no transaction active!");
-        } else {
-            TxResolutionInfo txInfo = new TxResolutionInfo(
-                    context.getTransactionID(), context.getSnapshotTimestamp());
-            context.abort(new TransactionAbortedException(
-                    txInfo, null, AbortCause.USER, context));
-            TransactionalContext.removeContext();
-        }
+        Transactions.abort();
     }
 
     /**
@@ -157,7 +143,7 @@ public class ObjectsView extends AbstractView {
      */
     @SuppressWarnings({"checkstyle:methodname", "checkstyle:abbreviation"})
     public boolean TXActive() {
-        return TransactionalContext.isInTransaction();
+        return Transactions.active();
     }
 
     /**
@@ -170,6 +156,8 @@ public class ObjectsView extends AbstractView {
     @SuppressWarnings({"checkstyle:methodname", "checkstyle:abbreviation"})
     public long TXEnd()
             throws TransactionAbortedException {
+        return Transactions.commit();
+        /*
         AbstractTransactionalContext context = TransactionalContext.getCurrentContext();
         if (context == null) {
             log.warn("Attempted to end a transaction, but no transaction active!");
@@ -210,7 +198,7 @@ public class ObjectsView extends AbstractView {
             } finally {
                 TransactionalContext.removeContext();
             }
-        }
+        }*/
     }
 
     /** Given a Corfu object, syncs the object to the most up to date version.

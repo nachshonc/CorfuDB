@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>Created by mwei on 1/11/16.
  */
 @Slf4j
+@Deprecated
 public class TransactionalContext {
 
     /** A thread local stack containing all transaction contexts
@@ -45,57 +46,6 @@ public class TransactionalContext {
      */
     public static Deque<AbstractTransactionalContext> getTransactionStack() {
         return threadTransactionStack.get();
-    }
-
-    /** The active write set for this thread. */
-    public static final ThreadLocal<WriteSetInfo> writeSet =
-            ThreadLocal.withInitial(WriteSetInfo::new);
-
-    /** Get the active write set for this thread. */
-    public static @Nonnull WriteSetInfo getWriteSet() {
-        return writeSet.get();
-    }
-
-    public static long addToWriteSet(ICorfuSMRProxyInternal proxy, SMREntry updateEntry,
-                                Object[] conflictObjects) {
-        return getWriteSet().add(proxy, updateEntry, conflictObjects);
-    }
-
-    /** Clear the current write set for this thread. */
-    public static void clearWriteSet() {
-        writeSet.remove();
-        writeSet.set(new WriteSetInfo());
-    }
-
-    public static @Nonnull ConflictSetInfo getConflictSet() {
-        return conflictSet.get();
-    }
-
-    /** The active conflict set for this thread. */
-    public static final ThreadLocal<ConflictSetInfo> conflictSet =
-            ThreadLocal.withInitial(ConflictSetInfo::new);
-
-    public static void clearConflictSet() {
-        conflictSet.remove();
-        conflictSet.set(new ConflictSetInfo());
-    }
-
-    /**
-     * Returns the current transactional context for the calling thread.
-     *
-     * @return The current transactional context for the calling thread.
-     */
-    public static AbstractTransactionalContext getCurrentContext() {
-        return getTransactionStack().peekFirst();
-    }
-
-    /**
-     * Returns the last transactional context (parent/root) for the calling thread.
-     *
-     * @return The last transactional context for the calling thread.
-     */
-    public static AbstractTransactionalContext getRootContext() {
-        return getTransactionStack().peekLast();
     }
 
     /**
@@ -130,16 +80,5 @@ public class TransactionalContext {
             }
         }
         return r;
-    }
-
-    /**
-     * Get the transaction stack as a list.
-     * @return  The transaction stack as a list.
-     */
-    public static List<AbstractTransactionalContext> getTransactionStackAsList() {
-        List<AbstractTransactionalContext> listReverse =
-                getTransactionStack().stream().collect(Collectors.toList());
-        Collections.reverse(listReverse);
-        return listReverse;
     }
 }

@@ -13,6 +13,7 @@ import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.logprotocol.SMREntry;
@@ -457,8 +458,9 @@ public class VersionLockedObject<T> {
      * @param record The record to undo.
      */
     protected void applyUndoRecordUnsafe(SMREntry record) {
-        log.trace("Undo[{}] of {}@{} ({})", this, record.getSMRMethod(),
+        log.trace("Undo[{}] of {}@{} {}->({})", this, record.getSMRMethod(),
                 record.getEntry() != null ? record.getEntry().getGlobalAddress() : "OPT",
+                record.getSMRArguments(),
                 record.getUndoRecord());
         IUndoFunction<T> undoFunction =
                 undoFunctionMap.get(record.getSMRMethod());

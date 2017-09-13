@@ -12,7 +12,7 @@ public class ReadAfterWriteTransactionalContext
     @Override
     protected <T> void addToReadSet(ICorfuSMRProxyInternal<T> proxy,
                                        Object[] conflictObject) {
-        TransactionalContext.getConflictSet().add(proxy, conflictObject);
+        Transactions.getContext().getConflictSet().add(proxy, conflictObject);
     }
 
 }

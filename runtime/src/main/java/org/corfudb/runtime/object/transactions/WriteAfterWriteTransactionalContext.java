@@ -34,7 +34,7 @@ public class WriteAfterWriteTransactionalContext
     protected <T> long addToWriteSet(ICorfuSMRProxyInternal<T> proxy,
                                      SMREntry updateEntry,
                                      Object[] conflictObject) {
-        TransactionalContext.getConflictSet().add(proxy, conflictObject);
+        Transactions.getContext().getConflictSet().add(proxy, conflictObject);
         return super.addToWriteSet(proxy, updateEntry, conflictObject);
     }
 

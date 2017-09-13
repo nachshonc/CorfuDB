@@ -99,18 +99,11 @@ public abstract class AbstractTransactionalContext implements
     @Getter(lazy = true)
     private final long snapshotTimestamp = obtainSnapshotTimestamp();
 
-
     /**
      * The address that the transaction was committed at.
      */
     @Getter
     public long commitAddress = AbstractTransactionalContext.UNCOMMITTED_ADDRESS;
-
-    /**
-     * The parent context of this transaction, if in a nested transaction.
-     */
-    @Getter
-    private final AbstractTransactionalContext parentContext;
 
     /**
      * A future which gets completed when this transaction commits.
@@ -125,8 +118,6 @@ public abstract class AbstractTransactionalContext implements
         this.builder = builder;
 
         startTime = System.currentTimeMillis();
-
-        parentContext = TransactionalContext.getCurrentContext();
 
         AbstractTransactionalContext.log.debug("TXBegin[{}]", this);
     }
@@ -221,8 +212,6 @@ public abstract class AbstractTransactionalContext implements
      */
     public void abort(TransactionAbortedException ae) {
         AbstractTransactionalContext.log.debug("abort[{}]", this);
-        TransactionalContext.clearWriteSet();
-        TransactionalContext.clearConflictSet();
         commitAddress = ABORTED_ADDRESS;
         completionFuture
                 .completeExceptionally(ae);

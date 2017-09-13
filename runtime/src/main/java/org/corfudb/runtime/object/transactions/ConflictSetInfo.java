@@ -56,13 +56,6 @@ public class ConflictSetInfo {
                         }));
     }
 
-    /** Merge a conflict set into this conflict set.
-     * @param other         The conflict set to merge.
-     */
-    public void mergeInto(ConflictSetInfo other) {
-        conflicts.putAll(other.conflicts);
-    }
-
     /** Add an operation into this conflict set. */
     public void add(ICorfuSMRProxyInternal proxy, Object[] conflictObjects) {
         if (conflictObjects == null) {

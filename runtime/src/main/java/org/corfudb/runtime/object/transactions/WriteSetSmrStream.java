@@ -60,7 +60,6 @@ import org.corfudb.util.Utils;
  *
  */
 @Slf4j
-@SuppressWarnings("checkstyle:abbreviationaswordinname")
 public class WriteSetSmrStream implements ISMRStream {
 
     final WriteSetInfo writeSet;
@@ -82,19 +81,6 @@ public class WriteSetSmrStream implements ISMRStream {
         reset();
     }
 
-    /** Return whether stream current transaction is the thread current transaction.
-     *
-     * <p>This is validated by checking whether the current context
-     * for this stream is the same as the current context for this thread.
-     *
-     * @return  True, if the stream current context is the thread current context.
-     *          False otherwise.
-     */
-    public boolean isStreamCurrentContextThreadCurrentContext() {
-        return writeSet
-                .equals(TransactionalContext.getWriteSet());
-    }
-
     /** Return whether we are the stream for this current thread
      *
      * <p>This is validated by checking whether the root context
@@ -105,7 +91,7 @@ public class WriteSetSmrStream implements ISMRStream {
      */
     public boolean isStreamForThisThread() {
         return writeSet
-                .equals(TransactionalContext.getWriteSet());
+                .equals(Transactions.getContext().getWriteSet());
     }
 
     @Override
@@ -118,12 +104,14 @@ public class WriteSetSmrStream implements ISMRStream {
                 .getSMRUpdates(id);
 
 
-        if (pointer >= updateList.size()) {
+        if (pointer > updateList.size() - 1) {
             return Collections.emptyList();
         }
 
-        List<SMREntry> result = updateList.subList((int)pointer + 1,
-                (int) Math.min(maxGlobal, updateList.size()));
+        int max = maxGlobal == Address.MAX || maxGlobal >= updateList.size() ? updateList.size()
+                  : (int) maxGlobal + 1;
+
+        List<SMREntry> result = updateList.subList((int)pointer + 1, max);
         pointer = updateList.size() - 1;
         return result;
     }
