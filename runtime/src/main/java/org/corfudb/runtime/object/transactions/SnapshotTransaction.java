@@ -1,16 +1,6 @@
 package org.corfudb.runtime.object.transactions;
 
-import com.google.common.collect.ImmutableSet;
-
-import java.util.Set;
-
-import lombok.Getter;
-
 import org.corfudb.protocols.logprotocol.SMREntry;
-import org.corfudb.protocols.wireprotocol.TxResolutionInfo;
-import org.corfudb.runtime.exceptions.AbortCause;
-import org.corfudb.runtime.exceptions.TransactionAbortedException;
-import org.corfudb.runtime.exceptions.TrimmedException;
 import org.corfudb.runtime.object.ICorfuSMRAccess;
 import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
 
@@ -23,9 +13,9 @@ import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
  *
  * <p>Created by mwei on 11/22/16.
  */
-public class SnapshotTransactionalContext extends AbstractTransactionalContext {
+public class SnapshotTransaction extends AbstractTransaction {
 
-    public SnapshotTransactionalContext(TransactionBuilder builder) {
+    public SnapshotTransaction(TransactionBuilder builder) {
         super(builder);
     }
 

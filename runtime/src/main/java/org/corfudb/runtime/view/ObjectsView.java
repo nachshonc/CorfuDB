@@ -13,17 +13,12 @@ import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import org.corfudb.protocols.wireprotocol.TxResolutionInfo;
 import org.corfudb.runtime.CorfuRuntime;
-import org.corfudb.runtime.exceptions.AbortCause;
-import org.corfudb.runtime.exceptions.NetworkException;
 import org.corfudb.runtime.exceptions.TransactionAbortedException;
 import org.corfudb.runtime.object.CorfuCompileWrapperBuilder;
 import org.corfudb.runtime.object.ICorfuSMR;
-import org.corfudb.runtime.object.transactions.AbstractTransactionalContext;
 import org.corfudb.runtime.object.transactions.TransactionBuilder;
 import org.corfudb.runtime.object.transactions.TransactionType;
-import org.corfudb.runtime.object.transactions.TransactionalContext;
 import org.corfudb.runtime.object.transactions.Transactions;
 import org.corfudb.runtime.view.stream.IStreamView;
 import org.corfudb.util.serializer.Serializers;
@@ -158,10 +153,10 @@ public class ObjectsView extends AbstractView {
             throws TransactionAbortedException {
         return Transactions.commit();
         /*
-        AbstractTransactionalContext context = TransactionalContext.getCurrentContext();
+        AbstractTransaction context = TransactionalContext.getCurrentContext();
         if (context == null) {
             log.warn("Attempted to end a transaction, but no transaction active!");
-            return AbstractTransactionalContext.UNCOMMITTED_ADDRESS;
+            return AbstractTransaction.UNCOMMITTED_ADDRESS;
         } else {
             long totalTime = System.currentTimeMillis() - context.getStartTime();
             log.trace("TXCommit[{}] time={} ms",

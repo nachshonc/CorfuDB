@@ -58,10 +58,10 @@ import javax.annotation.Nonnull;
  * <p>Created by mwei on 4/4/16.
  */
 @Slf4j
-public abstract class AbstractOptimisticTransactionalContext extends
-        AbstractTransactionalContext {
+public abstract class AbstractOptimisticTransaction extends
+        AbstractTransaction {
 
-    AbstractOptimisticTransactionalContext(TransactionBuilder builder) {
+    AbstractOptimisticTransaction(TransactionBuilder builder) {
         super(builder);
     }
 
@@ -224,7 +224,7 @@ public abstract class AbstractOptimisticTransactionalContext extends
     @SuppressWarnings("unchecked")
     public long commit() throws TransactionAbortedException {
         if (Transactions.isNested()) {
-            commitAddress = AbstractTransactionalContext.FOLDED_ADDRESS;
+            commitAddress = AbstractTransaction.FOLDED_ADDRESS;
             log.trace("commit[{}] Nested transaction folded", this);
             return commitAddress;
         }

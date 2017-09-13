@@ -3,7 +3,6 @@ package org.corfudb.runtime.object.transactions;
 import lombok.extern.slf4j.Slf4j;
 
 import org.corfudb.protocols.logprotocol.SMREntry;
-import org.corfudb.runtime.exceptions.TransactionAbortedException;
 import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
 
 /** A write-after-write transactional context.
@@ -22,10 +21,10 @@ import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
  * <p>Created by mwei on 11/21/16.
  */
 @Slf4j
-public class WriteAfterWriteTransactionalContext
-        extends AbstractOptimisticTransactionalContext {
+public class WriteAfterWriteTransaction
+        extends AbstractOptimisticTransaction {
 
-    WriteAfterWriteTransactionalContext(TransactionBuilder builder) {
+    WriteAfterWriteTransaction(TransactionBuilder builder) {
         super(builder);
         getSnapshotTimestamp();
     }

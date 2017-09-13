@@ -24,8 +24,7 @@ import org.corfudb.runtime.exceptions.NetworkException;
 import org.corfudb.runtime.exceptions.TransactionAbortedException;
 import org.corfudb.runtime.exceptions.TrimmedException;
 import org.corfudb.runtime.exceptions.TrimmedUpcallException;
-import org.corfudb.runtime.object.transactions.AbstractTransactionalContext;
-import org.corfudb.runtime.object.transactions.TransactionalContext;
+import org.corfudb.runtime.object.transactions.AbstractTransaction;
 import org.corfudb.runtime.object.transactions.Transactions;
 import org.corfudb.util.MetricsUtils;
 import org.corfudb.util.Utils;
@@ -486,7 +485,7 @@ public class CorfuCompileProxy<T> implements ICorfuSMRProxyInternal<T> {
         AbortCause abortCause;
         TransactionAbortedException tae;
 
-        AbstractTransactionalContext context = Transactions.current();
+        AbstractTransaction context = Transactions.current();
 
         if (e instanceof TransactionAbortedException) {
             tae = (TransactionAbortedException) e;

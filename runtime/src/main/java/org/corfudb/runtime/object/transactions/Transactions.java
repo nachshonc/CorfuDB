@@ -19,9 +19,8 @@ public class Transactions {
 
     /** A thread local stack containing all transactions for a given thread.
      */
-    private static final ThreadLocal<Deque<AbstractTransactionalContext>>
-            threadTransactionStack = ThreadLocal.withInitial(
-            LinkedList<AbstractTransactionalContext>::new);
+    private static final ThreadLocal<Deque<AbstractTransaction>>
+            threadTransactionStack = ThreadLocal.withInitial(LinkedList<AbstractTransaction>::new);
 
     /** A thread local containing the transaction context for a given thread.
      * This context is reset whenever a transaction stack is committed or aborted.
@@ -29,18 +28,17 @@ public class Transactions {
     private static final ThreadLocal<TransactionContext>
             transactionContext = ThreadLocal.withInitial(TransactionContext::new);
 
-
     /** Begin a new transaction.
      *
      * @param transaction   The transaction which will begin execution.
      */
-    public static void begin(AbstractTransactionalContext transaction) {
+    public static void begin(AbstractTransaction transaction) {
         // Optimistic transactions may only be nested on
         // other optimistic transactions.
         if (active()
-                && transaction instanceof AbstractOptimisticTransactionalContext
+                && transaction instanceof AbstractOptimisticTransaction
                 && !(threadTransactionStack.get().getFirst()
-                instanceof AbstractOptimisticTransactionalContext)) {
+                instanceof AbstractOptimisticTransaction)) {
             throw new TransactionAbortedException(
                     new TxResolutionInfo(new UUID(0, 0), 0),
                     null, AbortCause.UNSUPPORTED, null);
@@ -102,7 +100,7 @@ public class Transactions {
      *
      * @return  The current active transaction, or null, if no transaction is present.
      */
-    public static AbstractTransactionalContext current() {
+    public static AbstractTransaction current() {
         return threadTransactionStack.get().peekFirst();
     }
 

@@ -1,7 +1,6 @@
 package org.corfudb.runtime.object.transactions;
 
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -31,7 +30,7 @@ import org.corfudb.util.Utils;
  * <p>First, forget about nested transactions for now, and neglect the contexts
  * stack; that is, assume the stack has size 1.
  *
- * <p>A reminder from AbstractTransactionalContext about the write-set of a
+ * <p>A reminder from AbstractTransaction about the write-set of a
  * transaction:
  * * A write-set is a key component of a transaction.
  * * We collect the write-set as a map, organized by streams.
@@ -62,7 +61,7 @@ import org.corfudb.util.Utils;
 @Slf4j
 public class WriteSetSmrStream implements ISMRStream {
 
-    final WriteSetInfo writeSet;
+    final WriteSet writeSet;
 
     long pointer;
 
@@ -73,7 +72,7 @@ public class WriteSetSmrStream implements ISMRStream {
      * Returns a new WriteSetSmrStream containing transactional contexts and stream id.
      * @param id  stream id
      */
-    public WriteSetSmrStream(WriteSetInfo writeSet,
+    public WriteSetSmrStream(WriteSet writeSet,
                              UUID id) {
         this.writeSet = writeSet;
         this.id = id;

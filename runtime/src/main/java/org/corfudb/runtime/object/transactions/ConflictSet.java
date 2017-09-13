@@ -18,11 +18,11 @@ import lombok.Getter;
  * transaction execution.
  */
 @Getter
-public class ConflictSetInfo {
+public class ConflictSet {
 
 
     /** Set of objects this conflict set conflicts with. */
-    protected Map<ICorfuSMRProxyInternal, Set<Object>> conflicts = new HashMap<>();
+    protected final Map<ICorfuSMRProxyInternal, Set<Object>> conflicts = new HashMap<>();
 
     /** Get a hash for the object, given a proxy. */
     public static byte[] generateHashFromObject(ICorfuSMRProxyInternal p, Object o) {
@@ -45,7 +45,7 @@ public class ConflictSetInfo {
                         e -> e.getKey().getStreamID(),
                         // Value = Generated hash.
                         e -> e.getValue().stream()
-                                .map(o -> ConflictSetInfo.generateHashFromObject(e.getKey(), o))
+                                .map(o -> ConflictSet.generateHashFromObject(e.getKey(), o))
                                 .collect(Collectors.toSet()),
                         // Merge function, in case key was already mapped
                         // (If two proxies have the same stream).

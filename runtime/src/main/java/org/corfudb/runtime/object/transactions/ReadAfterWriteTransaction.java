@@ -2,10 +2,10 @@ package org.corfudb.runtime.object.transactions;
 
 import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
 
-public class ReadAfterWriteTransactionalContext
-        extends AbstractOptimisticTransactionalContext {
+public class ReadAfterWriteTransaction
+        extends AbstractOptimisticTransaction {
 
-    public ReadAfterWriteTransactionalContext(TransactionBuilder builder) {
+    public ReadAfterWriteTransaction(TransactionBuilder builder) {
         super(builder);
     }
 

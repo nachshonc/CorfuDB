@@ -33,7 +33,7 @@ import org.corfudb.util.Utils;
  * <p>Within transactional context, these methods invoke the transactionalContext
  * accessor/mutator helper.
  *
- * <p>For example, OptimisticTransactionalContext.access() is responsible for
+ * <p>For example, OptimisticTransaction.access() is responsible for
  * sync'ing the proxy state to the snapshot version, and then doing the access.
  *
  * <p>logUpdate() within transactional context is
@@ -48,8 +48,8 @@ import org.corfudb.util.Utils;
  */
 @Slf4j
 @ToString
-public abstract class AbstractTransactionalContext implements
-        Comparable<AbstractTransactionalContext> {
+public abstract class AbstractTransaction implements
+        Comparable<AbstractTransaction> {
 
     /**
      * Constant for the address of an uncommitted log entry.
@@ -103,7 +103,7 @@ public abstract class AbstractTransactionalContext implements
      * The address that the transaction was committed at.
      */
     @Getter
-    public long commitAddress = AbstractTransactionalContext.UNCOMMITTED_ADDRESS;
+    public long commitAddress = AbstractTransaction.UNCOMMITTED_ADDRESS;
 
     /**
      * A future which gets completed when this transaction commits.
@@ -113,13 +113,13 @@ public abstract class AbstractTransactionalContext implements
     public CompletableFuture<Boolean> completionFuture =
             new CompletableFuture<>();
 
-    AbstractTransactionalContext(TransactionBuilder builder) {
+    AbstractTransaction(TransactionBuilder builder) {
         transactionID = UUID.randomUUID();
         this.builder = builder;
 
         startTime = System.currentTimeMillis();
 
-        AbstractTransactionalContext.log.debug("TXBegin[{}]", this);
+        AbstractTransaction.log.debug("TXBegin[{}]", this);
     }
 
     /**
@@ -211,7 +211,7 @@ public abstract class AbstractTransactionalContext implements
      * Forcefully abort the transaction.
      */
     public void abort(TransactionAbortedException ae) {
-        AbstractTransactionalContext.log.debug("abort[{}]", this);
+        AbstractTransaction.log.debug("abort[{}]", this);
         commitAddress = ABORTED_ADDRESS;
         completionFuture
                 .completeExceptionally(ae);
@@ -223,7 +223,7 @@ public abstract class AbstractTransactionalContext implements
      * Transactions are ordered by their snapshot timestamp.
      */
     @Override
-    public int compareTo(AbstractTransactionalContext o) {
+    public int compareTo(AbstractTransaction o) {
         return Long.compare(this.getSnapshotTimestamp(), o
                 .getSnapshotTimestamp());
     }

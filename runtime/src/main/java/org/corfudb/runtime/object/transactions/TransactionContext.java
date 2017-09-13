@@ -9,10 +9,10 @@ import lombok.Getter;
 public class TransactionContext {
 
     @Getter
-    final WriteSetInfo writeSet = new WriteSetInfo();
+    final WriteSet writeSet = new WriteSet();
 
     @Getter
-    final ConflictSetInfo conflictSet = new ConflictSetInfo();
+    final ConflictSet conflictSet = new ConflictSet();
 
     @Getter
     long optimisticSnapshot;

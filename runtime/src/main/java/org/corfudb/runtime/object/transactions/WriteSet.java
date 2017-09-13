@@ -15,18 +15,14 @@ import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
  * transaction execution.
  */
 @Getter
-public class WriteSetInfo extends ConflictSetInfo {
-
-    /** The set of mutated objects. */
-    Set<UUID> affectedStreams = new HashSet<>();
+public class WriteSet extends ConflictSet {
 
     /** The actual updates to mutated objects. */
-    MultiObjectSMREntry writeSet = new MultiObjectSMREntry();
+    final MultiObjectSMREntry writeSet = new MultiObjectSMREntry();
 
 
     public long add(ICorfuSMRProxyInternal proxy, SMREntry updateEntry, Object[] conflictObjects) {
         super.add(proxy, conflictObjects);
-        affectedStreams.add(proxy.getStreamID());
         writeSet.addTo(proxy.getStreamID(), updateEntry);
         return writeSet.getSMRUpdates(proxy.getStreamID()).size() - 1;
     }
