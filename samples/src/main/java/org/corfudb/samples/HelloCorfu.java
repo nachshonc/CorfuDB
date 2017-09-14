@@ -1,12 +1,18 @@
 package org.corfudb.samples;
 
 import org.corfudb.runtime.CorfuRuntime;
+import org.corfudb.runtime.collections.CorfuTable;
 import org.corfudb.runtime.collections.SMRMap;
+import org.corfudb.runtime.object.transactions.AbstractTransactionalContext;
+import org.corfudb.runtime.object.transactions.TransactionalContext;
 import org.corfudb.util.GitRepositoryState;
 
 import org.docopt.Docopt;
 
 import java.util.Map;
+import java.util.UUID;
+
+import static org.corfudb.runtime.object.transactions.TransactionType.FUTURE;
 
 /**
  * This tutorial demonstrates a simple Corfu application.
@@ -59,10 +65,10 @@ public class HelloCorfu {
          * We will instantiate a stream by giving it a name "A",
          * and then instantiate an object by specifying its class
          */
-        Map<String, Integer> map = runtime.getObjectsView()
+        CorfuTable map = runtime.getObjectsView()
                 .build()
                 .setStreamName("A")     // stream name
-                .setType(SMRMap.class)  // object class backed by this stream
+                .setType(CorfuTable.class)  // object class backed by this stream
                 .open();                // instantiate the object!
 
         /**
@@ -74,14 +80,24 @@ public class HelloCorfu {
          * For example, try the following code repeatedly in a sequence, in between run/exit,
          * from multiple instances, and see the different interleaving of values that result.
          */
-         Integer previous = map.get("a");
+        //runtime.getObjectsView().TXBegin();
+        runtime.getObjectsView().TXBuild()
+                .setType(FUTURE)
+                .begin();
+
+        AbstractTransactionalContext tx = TransactionalContext.getCurrentContext();
+        UUID uuid = CorfuRuntime.getStreamID("A");//Hack :(
+
+            map.getFuture("a", tx, uuid);
+         Object previous = map.get("a");
          if (previous == null) {
              System.out.println("This is the first time we were run!");
              map.put("a", 1);
          }
          else {
-             map.put("a", ++previous);
+             map.put("a", (Integer) previous + 1);
              System.out.println("This is the " + previous + " time we were run!");
          }
+         runtime.getObjectsView().TXEnd();
     }
 }

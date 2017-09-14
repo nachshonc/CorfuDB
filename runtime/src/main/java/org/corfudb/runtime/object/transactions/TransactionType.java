@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 public enum TransactionType {
     OPTIMISTIC(OptimisticTransactionalContext::new),
     SNAPSHOT(SnapshotTransactionalContext::new),
+    FUTURE(FutureTransactionalContext::new),
     WRITE_AFTER_WRITE(WriteAfterWriteTransactionalContext::new);
 
     final Function<TransactionBuilder, ? extends AbstractTransactionalContext> get;

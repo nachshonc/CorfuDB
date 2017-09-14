@@ -7,17 +7,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.reflect.TypeToken;
 
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.ConcurrentModificationException;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -37,6 +28,8 @@ import org.corfudb.annotations.DontInstrument;
 import org.corfudb.annotations.Mutator;
 import org.corfudb.annotations.MutatorAccessor;
 import org.corfudb.annotations.TransactionalMethod;
+import org.corfudb.runtime.object.transactions.AbstractTransactionalContext;
+import org.corfudb.runtime.object.transactions.FutureTransactionalContext;
 
 /** The CorfuTable implements a simple key-value store.
  *
@@ -168,6 +161,14 @@ public class CorfuTable<K ,V, F extends Enum<F> & CorfuTable.IndexSpecification,
     public CorfuTable() {
         log.error("CorfuTable: Creating a table without secondary indexes! Secondary index lookup"
             + " will DEGRADE to a full scan");
+    }
+
+    public boolean getFuture(K k, AbstractTransactionalContext tx, UUID uuid){
+        FutureTransactionalContext txf = (FutureTransactionalContext)tx;
+	//TODO: supply a more reasonable function that call this::get with parameter k. 
+        txf.addFuture(CompletableFuture.supplyAsync( () -> "Hello" ), uuid);
+        System.out.println("getFuture");
+        return true;
     }
 
     /** {@inheritDoc} */

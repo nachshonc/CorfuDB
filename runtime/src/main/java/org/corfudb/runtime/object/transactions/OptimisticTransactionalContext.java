@@ -233,6 +233,11 @@ public class OptimisticTransactionalContext extends AbstractTransactionalContext
         return getConflictSetAndCommit(getReadSetInfo());
     }
 
+
+    public long superCommitTransaction() throws TransactionAbortedException{
+        return super.commitTransaction();
+    }
+
     /**
      * Commit with a given conflict set and return the address.
      *

@@ -194,4 +194,110 @@ public class StreamsView extends AbstractView {
                 ILogData.getSerializedSize(object));
         throw new AppendException();
     }
+
+//TODO: replace append with calls to append1 and then append2. 
+//Put correct names!!!
+
+    public TokenResponse append1(@Nonnull Set<UUID> streamIDs,
+                       @Nullable TxResolutionInfo conflictInfo) throws TransactionAbortedException {
+
+        // Go to the sequencer, grab an initial token.
+        TokenResponse tokenResponse = conflictInfo == null
+                ? runtime.getSequencerView().nextToken(streamIDs, 1) // Token w/o conflict info
+                : runtime.getSequencerView().nextToken(streamIDs, 1,
+                conflictInfo); // Token w/ conflict info
+
+        return tokenResponse;
+    }
+
+    public long append2(@Nonnull Set<UUID> streamIDs, @Nonnull Object object,
+                        @Nullable TxResolutionInfo conflictInfo, TokenResponse tokenResponse) throws TransactionAbortedException {
+
+        for (int x = 0; x < runtime.getWriteRetry(); x++) {
+
+            // Is our token a valid type?
+            if (tokenResponse.getRespType() == TokenType.TX_ABORT_CONFLICT) {
+                throw new TransactionAbortedException(
+                        conflictInfo,
+                        tokenResponse.getConflictKey(),
+                        AbortCause.CONFLICT,
+                        TransactionalContext.getCurrentContext());
+            } else if (tokenResponse.getRespType() == TokenType.TX_ABORT_NEWSEQ) {
+                throw new TransactionAbortedException(
+                        conflictInfo,
+                        tokenResponse.getConflictKey(),
+                        AbortCause.NEW_SEQUENCER,
+                        TransactionalContext.getCurrentContext());
+            } else if (tokenResponse.getRespType() == TokenType.TX_ABORT_SEQ_OVERFLOW) {
+                throw new TransactionAbortedException(
+                        conflictInfo,
+                        tokenResponse.getConflictKey(),
+                        AbortCause.SEQUENCER_OVERFLOW,
+                        TransactionalContext.getCurrentContext());
+            } else if (tokenResponse.getRespType() == TokenType.TX_ABORT_SEQ_TRIM) {
+                throw new TransactionAbortedException(
+                        conflictInfo,
+                        tokenResponse.getConflictKey(),
+                        AbortCause.SEQUENCER_TRIM,
+                        TransactionalContext.getCurrentContext());
+            }
+
+            //NACHSHON: we should resolve getFuture and putFuture here. This is after acquiring an address from the server
+            //and before sending the actual updates to the server.
+            // Attempt to write to the log
+            try {
+                runtime.getAddressSpaceView().write(tokenResponse, object);
+                // If we're here, we succeeded, return the acquired token
+                return tokenResponse.getTokenValue();
+            } catch (OverwriteException oe) {
+
+                // We were overwritten, get a new token and try again.
+                log.warn("append[{}]: Overwritten after {} retries, streams {}",
+                        tokenResponse.getTokenValue(),
+                        x,
+                        streamIDs.stream().map(Utils::toReadableId).collect(Collectors.toSet()));
+
+                TokenResponse temp;
+                if (conflictInfo == null) {
+                    // Token w/o conflict info
+                    temp = runtime.getSequencerView().nextToken(streamIDs, 1);
+                } else {
+
+                    // On retry, check for conflicts only from the previous
+                    // attempt position
+                    conflictInfo.setSnapshotTimestamp(tokenResponse.getToken().getTokenValue());
+
+                    // Token w/ conflict info
+                    temp = runtime.getSequencerView().nextToken(streamIDs,
+                            1, conflictInfo);
+                }
+
+                // We need to fix the token (to use the stream addresses- may
+                // eventually be deprecated since these are no longer used)
+                tokenResponse = new TokenResponse(
+                        temp.getRespType(), tokenResponse.getConflictKey(),
+                        temp.getToken(), temp.getBackpointerMap());
+
+            } catch (StaleTokenException se) {
+                // the epoch changed from when we grabbed the token from sequencer
+                log.warn("append[{}]: StaleToken , streams {}", tokenResponse.getTokenValue(),
+                        streamIDs.stream().map(Utils::toReadableId).collect(Collectors.toSet()));
+
+                throw new TransactionAbortedException(
+                        conflictInfo,
+                        tokenResponse.getConflictKey(),
+                        AbortCause.NEW_SEQUENCER, // in the future, perhaps define a new AbortCause?
+                        TransactionalContext.getCurrentContext());
+            }
+        }
+
+        log.error("append[{}]: failed after {} retries , streams {}, write size {} bytes",
+                tokenResponse.getTokenValue(),
+                runtime.getWriteRetry(),
+                streamIDs.stream().map(Utils::toReadableId).collect(Collectors.toSet()),
+                ILogData.getSerializedSize(object));
+        throw new AppendException();
+    }
+
+
 }
