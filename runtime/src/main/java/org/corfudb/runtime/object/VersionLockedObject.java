@@ -228,6 +228,12 @@ public class VersionLockedObject<T> {
         }
     }
 
+    //similar to access above, but accessFunction does not really access the object but only record the operation for
+    //later access. Just apply this function on the object
+    public <R> R noAccess(Function<T, R> accessFunction) {
+        return accessFunction.apply(object);
+    }
+
     /**
      * Update the object under a write lock.
      *

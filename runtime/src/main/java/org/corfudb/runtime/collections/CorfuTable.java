@@ -212,9 +212,14 @@ public class CorfuTable<K ,V, F extends Enum<F> & CorfuTable.IndexSpecification,
             return get();
         }
     }
+//Hack: we signal to the system that an operation is a future read and has no conflict by passing this 
+//argument as a conflict parameter. The transactional context will find this and avoid synchronizing. 
+    public static class NoConflict{ }
+    public static final NoConflict noConflict = new NoConflict();
 
     /** Get the value of key @k using a deferred read. */
-    public Future<V> getFuture(K k, AbstractTransactionalContext tx, UUID uuid){
+    public Future<V> getFuture(K k, AbstractTransactionalContext tx, UUID uuid, @ConflictParameter NoConflict noConflict){
+        assert(noConflict == CorfuTable.noConflict); //A hack to signal the system that this is a deferred read. Don't use for other proposes.
         FutureTransactionalContext txf = (FutureTransactionalContext)tx;
         DefR d = new DefR(k);
         TxnFuture tf = new TxnFuture(d);

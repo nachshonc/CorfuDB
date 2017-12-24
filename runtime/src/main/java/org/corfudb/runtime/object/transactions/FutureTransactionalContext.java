@@ -3,6 +3,10 @@ package org.corfudb.runtime.object.transactions;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.wireprotocol.TokenResponse;
 import org.corfudb.protocols.wireprotocol.TxResolutionInfo;
+import org.corfudb.runtime.collections.CorfuTable;
+import org.corfudb.runtime.object.ICorfuSMRAccess;
+import org.corfudb.runtime.object.ICorfuSMRProxyInternal;
+import org.corfudb.runtime.object.VersionLockedObject;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -64,8 +68,8 @@ public class FutureTransactionalContext extends OptimisticTransactionalContext {
 
         long currentVersion = response.getTokenValue();
 
-        setSnapshotTimestamp(currentVersion-1);
-        for(Callable<Object> f : futureSet){
+        setSnapshotTimestamp(currentVersion - 1);
+        for (Callable<Object> f : futureSet) {
             try {
                 f.call();
             } catch (InterruptedException e) {
@@ -79,25 +83,25 @@ public class FutureTransactionalContext extends OptimisticTransactionalContext {
 
         address = this.builder.runtime.getStreamsView().appendWriteLogEntry(
 
-                        // a set of stream-IDs that contains the affected streams
-                        affectedStreams,
+                // a set of stream-IDs that contains the affected streams
+                affectedStreams,
 
-                        // a MultiObjectSMREntry that contains the update(s) to objects
-                        collectWriteSetEntries(),
+                // a MultiObjectSMREntry that contains the update(s) to objects
+                collectWriteSetEntries(),
 
-                        // TxResolution info:
-                        // 1. snapshot timestamp
-                        // 2. a map of conflict params, arranged by streamID's
-                        // 3. a map of write conflict-params, arranged by
-                        // streamID's
-                        new TxResolutionInfo(getTransactionID(),
-                                getSnapshotTimestamp(),
-                                conflictSet.getHashedConflictSet(),
-                                getWriteSetInfo().getHashedConflictSet()),
+                // TxResolution info:
+                // 1. snapshot timestamp
+                // 2. a map of conflict params, arranged by streamID's
+                // 3. a map of write conflict-params, arranged by
+                // streamID's
+                new TxResolutionInfo(getTransactionID(),
+                        getSnapshotTimestamp(),
+                        conflictSet.getHashedConflictSet(),
+                        getWriteSetInfo().getHashedConflictSet()),
 
 
-                        response
-                );
+                response
+        );
 
         log.trace("Commit[{}] Acquire address {}", this, address);
 
@@ -107,5 +111,25 @@ public class FutureTransactionalContext extends OptimisticTransactionalContext {
         tryCommitAllProxies();
         log.trace("Commit[{}] Written to {}", this, address);
         return address;
+    }
+
+    @Override
+    public <R, T> R access(ICorfuSMRProxyInternal<T> proxy,
+                           ICorfuSMRAccess<R, T> accessFunction,
+                           Object[] conflictObject) {
+        if (conflictObject[0] == CorfuTable.noConflict) {
+            log.debug("Access[{},{}] in deferred manner. conflictObj={}", this, proxy, conflictObject);
+            //just access the object and return. There is no real access to the underlying data structure -
+            //this will happen later during the commit.
+            //We need to access the object in order to create the deferred read object because we need the
+            //scope variables, e.g., key
+            return proxy.
+                    getUnderlyingObject().
+                    noAccess(o -> accessFunction.access(o));
+
+            //R ret = accessFunction.access(V.object);
+            //return ret;
+        }
+        return super.access(proxy, accessFunction, conflictObject);
     }
 }

@@ -90,7 +90,7 @@ public class HelloCorfu {
         AbstractTransactionalContext tx = TransactionalContext.getCurrentContext();
         UUID uuid = CorfuRuntime.getStreamID("A");//Hack :(
 
-        Future<Object> f = map.getFuture("a", tx, uuid);
+        Future<Object> f = map.getFuture("a", tx, uuid, CorfuTable.noConflict);
          Object previous = map.get("a");
          if (previous == null) {
              System.out.println("This is the first time we were run!");
