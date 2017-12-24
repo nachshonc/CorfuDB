@@ -11,6 +11,8 @@ import org.docopt.Docopt;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import static org.corfudb.runtime.object.transactions.TransactionType.FUTURE;
 
@@ -88,7 +90,7 @@ public class HelloCorfu {
         AbstractTransactionalContext tx = TransactionalContext.getCurrentContext();
         UUID uuid = CorfuRuntime.getStreamID("A");//Hack :(
 
-            map.getFuture("a", tx, uuid);
+        Future<Object> f = map.getFuture("a", tx, uuid);
          Object previous = map.get("a");
          if (previous == null) {
              System.out.println("This is the first time we were run!");
@@ -96,8 +98,16 @@ public class HelloCorfu {
          }
          else {
              map.put("a", (Integer) previous + 1);
-             System.out.println("This is the " + previous + " time we were run!");
+             System.out.println("This is the " + ((Integer)previous+1) + " time we were run!");
          }
+         System.out.println("Just before commiting");
          runtime.getObjectsView().TXEnd();
+        try {
+            System.out.println("Defr value is " + (Integer)f.get());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
     }
 }

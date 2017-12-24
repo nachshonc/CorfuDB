@@ -3,13 +3,11 @@ package org.corfudb.runtime.object.transactions;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.wireprotocol.TokenResponse;
 import org.corfudb.protocols.wireprotocol.TxResolutionInfo;
-import org.corfudb.runtime.exceptions.TransactionAbortedException;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 
 import static org.corfudb.runtime.view.ObjectsView.TRANSACTION_STREAM_ID;
 
@@ -20,11 +18,11 @@ public class FutureTransactionalContext extends OptimisticTransactionalContext {
         super(builder);
     }
 
-    Set<CompletableFuture> futureSet = new HashSet<>();
+    Set<Callable<Object>> futureSet = new HashSet<>();
     Set<UUID> futureAffectedStream = new HashSet<>();
 
 
-    public void addFuture(CompletableFuture f, UUID uuid){
+    public void addFuture(Callable<Object> f, UUID uuid){
         futureSet.add(f);
         futureAffectedStream.add(uuid);
     }
@@ -60,24 +58,26 @@ public class FutureTransactionalContext extends OptimisticTransactionalContext {
         // address of -1L if it is rejected.
         long address = -1L;
 
-        TokenResponse response = this.builder.runtime.getStreamsView().append1( // a set of stream-IDs that contains the affected streams
+        TokenResponse response = this.builder.runtime.getStreamsView().appendAcquireToken( // a set of stream-IDs that contains the affected streams
                 affectedStreams,
                 null);
 
         long currentVersion = response.getTokenValue();
 
         setSnapshotTimestamp(currentVersion-1);
-        for(CompletableFuture f : futureSet){
+        for(Callable<Object> f : futureSet){
             try {
-                f.get();
+                f.call();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
                 e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
-        address = this.builder.runtime.getStreamsView().append2(
+        address = this.builder.runtime.getStreamsView().appendWriteLogEntry(
 
                         // a set of stream-IDs that contains the affected streams
                         affectedStreams,

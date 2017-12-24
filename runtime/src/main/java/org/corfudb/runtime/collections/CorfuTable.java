@@ -8,7 +8,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.reflect.TypeToken;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -163,12 +163,64 @@ public class CorfuTable<K ,V, F extends Enum<F> & CorfuTable.IndexSpecification,
             + " will DEGRADE to a full scan");
     }
 
-    public boolean getFuture(K k, AbstractTransactionalContext tx, UUID uuid){
+    /** Internal representation of the deferred read. */
+    public class DefR implements Callable<Object>{
+        V v;
+        K k;
+        DefR(K k_){
+            k=k_;
+            v=null;
+        }
+        @Override
+        public Object call() throws Exception {
+            if(v==null) {
+                v = CorfuTable.this.get(k);
+                System.out.println("Evaluating a deferred read");
+            }
+            return v;
+        }
+    }
+    /**Represent the return value of a deferred read. Mainly encapsulate the internal DefR object */
+    public class TxnFuture implements Future<V> {
+        DefR defR;
+        TxnFuture(DefR d){
+            defR= d;
+        }
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return false;
+        }
+        @Override
+        public boolean isCancelled() {
+            return false;
+        }
+        @Override
+        public boolean isDone() {
+            return false;
+        }
+        @Override
+        public V get() throws InterruptedException, ExecutionException {
+            try {
+                return (V)defR.call();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new InterruptedException();
+            }
+        }
+        @Override
+        public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            return get();
+        }
+    }
+
+    /** Get the value of key @k using a deferred read. */
+    public Future<V> getFuture(K k, AbstractTransactionalContext tx, UUID uuid){
         FutureTransactionalContext txf = (FutureTransactionalContext)tx;
-	//TODO: supply a more reasonable function that call this::get with parameter k. 
-        txf.addFuture(CompletableFuture.supplyAsync( () -> "Hello" ), uuid);
-        System.out.println("getFuture");
-        return true;
+        DefR d = new DefR(k);
+        TxnFuture tf = new TxnFuture(d);
+        Callable<Object> dd = d;
+        txf.addFuture(dd, uuid);
+        return tf;
     }
 
     /** {@inheritDoc} */

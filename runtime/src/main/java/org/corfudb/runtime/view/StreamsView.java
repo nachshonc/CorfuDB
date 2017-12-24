@@ -195,11 +195,10 @@ public class StreamsView extends AbstractView {
         throw new AppendException();
     }
 
-//TODO: replace append with calls to append1 and then append2. 
-//Put correct names!!!
+//TODO: replace append with calls to appendAcquireToken and then appendWriteLogEntry.
 
-    public TokenResponse append1(@Nonnull Set<UUID> streamIDs,
-                       @Nullable TxResolutionInfo conflictInfo) throws TransactionAbortedException {
+    public TokenResponse appendAcquireToken(@Nonnull Set<UUID> streamIDs,
+                                            @Nullable TxResolutionInfo conflictInfo) throws TransactionAbortedException {
 
         // Go to the sequencer, grab an initial token.
         TokenResponse tokenResponse = conflictInfo == null
@@ -210,8 +209,8 @@ public class StreamsView extends AbstractView {
         return tokenResponse;
     }
 
-    public long append2(@Nonnull Set<UUID> streamIDs, @Nonnull Object object,
-                        @Nullable TxResolutionInfo conflictInfo, TokenResponse tokenResponse) throws TransactionAbortedException {
+    public long appendWriteLogEntry(@Nonnull Set<UUID> streamIDs, @Nonnull Object object,
+                                    @Nullable TxResolutionInfo conflictInfo, TokenResponse tokenResponse) throws TransactionAbortedException {
 
         for (int x = 0; x < runtime.getWriteRetry(); x++) {
 
@@ -242,9 +241,6 @@ public class StreamsView extends AbstractView {
                         TransactionalContext.getCurrentContext());
             }
 
-            //NACHSHON: we should resolve getFuture and putFuture here. This is after acquiring an address from the server
-            //and before sending the actual updates to the server.
-            // Attempt to write to the log
             try {
                 runtime.getAddressSpaceView().write(tokenResponse, object);
                 // If we're here, we succeeded, return the acquired token
